@@ -134,14 +134,38 @@ Before pushing a release tag, these repositories must exist:
 - `MarlonJD/scoop-bucket`
 - `MarlonJD/winget-pkgs`, forked from `microsoft/winget-pkgs`
 
-The `mobile-release-tools` repository must also define these GitHub Actions
-secrets:
+The default tag workflow can publish direct GitHub Release assets with the
+automatic `GITHUB_TOKEN`; no manual secret is needed for that path.
 
-- `RELEASE_PUBLISH_TOKEN`: personal access token with write access to
-  `MarlonJD/homebrew-tap` and `MarlonJD/scoop-bucket`.
-- `WINGET_TOKEN`: personal access token with write access to
-  `MarlonJD/winget-pkgs`. If omitted, the workflow reuses
-  `RELEASE_PUBLISH_TOKEN`.
+Package-manager metadata publishing needs repository secrets in
+`MarlonJD/mobile-release-tools` because the workflow must push commits to other
+repositories. Add them at:
+
+```text
+https://github.com/MarlonJD/mobile-release-tools/settings/secrets/actions
+```
+
+Required repository secrets:
+
+| Secret name | Value | Used for |
+| --- | --- | --- |
+| `RELEASE_PUBLISH_TOKEN` | GitHub personal access token with write access to `MarlonJD/homebrew-tap` and `MarlonJD/scoop-bucket` | Homebrew Cask and Scoop metadata commits |
+| `WINGET_TOKEN` | GitHub personal access token with write access to `MarlonJD/winget-pkgs` | WinGet manifest branch and pull request |
+
+`WINGET_TOKEN` may use the same token value as `RELEASE_PUBLISH_TOKEN` if that
+token can write to all three package-manager repositories.
+
+Recommended token options:
+
+- Easiest for public repositories: create a classic personal access token with
+  only the `public_repo` scope.
+- More restrictive: create a fine-grained personal access token for selected
+  repositories. Select `MarlonJD/homebrew-tap`, `MarlonJD/scoop-bucket`, and
+  `MarlonJD/winget-pkgs`; grant `Contents: Read and write` and
+  `Pull requests: Read and write`.
+
+Do not add a `GITHUB_TOKEN` secret manually. GitHub Actions provides it
+automatically for the current repository.
 
 ## Maintainer Release Flow
 
