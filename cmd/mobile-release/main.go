@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,6 +21,8 @@ Usage:
   mobile-release changelog --repo . --from v1.4.2 --to HEAD --version 1.4.3 [--output RELEASE_NOTES.md]
   mobile-release hash --file path/to/artifact
   mobile-release manifest --platform ios|android --version 1.4.3 --build 104 --artifact path [--notes RELEASE_NOTES.md] [--output manifest.json]
+  mobile-release mobile package android --version 1.4.3 --build 1848 --channel production
+  mobile-release mobile package ios --version 1.4.3 --build 1848 --export-options apps/ios/release/ExportOptions-app-store.plist
 `
 
 func main() {
@@ -43,8 +47,28 @@ func run(args []string, stdout io.Writer) error {
 		return runHash(args[1:], stdout)
 	case "manifest":
 		return runManifest(args[1:], stdout)
+	case "mobile":
+		return runMobile(args[1:], stdout)
 	default:
 		return fmt.Errorf("unknown command %q\n\n%s", args[0], usage)
+	}
+}
+
+func runMobile(args []string, stdout io.Writer) error {
+	if len(args) < 2 {
+		return fmt.Errorf("usage: mobile-release mobile package ios|android")
+	}
+	if args[0] != "package" {
+		return fmt.Errorf("unknown mobile command %q; supported command: package", args[0])
+	}
+
+	switch args[1] {
+	case "android":
+		return runMobilePackageAndroid(args[2:], stdout)
+	case "ios":
+		return runMobilePackageIOS(args[2:], stdout)
+	default:
+		return fmt.Errorf("unknown mobile package platform %q; expected ios or android", args[1])
 	}
 }
 
@@ -156,6 +180,115 @@ func runManifest(args []string, stdout io.Writer) error {
 	return writeOutput(*output, data, stdout)
 }
 
+func runMobilePackageAndroid(args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("mobile package android", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	projectDir := fs.String("project", "apps/android", "Android project directory")
+	gradle := fs.String("gradle", "./gradlew", "Gradle executable path relative to project")
+	module := fs.String("module", ":app", "Gradle app module path")
+	versionInput := fs.String("version", "", "Android versionName semantic version")
+	build := fs.String("build", "", "Android versionCode")
+	channel := fs.String("channel", "production", "distribution channel")
+	signing := fs.String("signing", release.AndroidSigningEnv, "signing source: env, external, or unsigned")
+	skipTests := fs.Bool("skip-tests", false, "skip Android unit tests")
+	includeAPK := fs.Bool("include-apk", false, "also build release APK for QA")
+	dryRun := fs.Bool("dry-run", false, "print commands without running them")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *versionInput == "" || *build == "" {
+		return fmt.Errorf("missing required flags: --version and --build are required")
+	}
+
+	version, err := release.ParseVersion(*versionInput)
+	if err != nil {
+		return err
+	}
+	if err := release.ValidateAndroidSigning(*signing, os.LookupEnv); err != nil {
+		return err
+	}
+	commands, err := release.AndroidPackageCommands(release.AndroidPackageOptions{
+		ProjectDir: *projectDir,
+		Gradle:     *gradle,
+		Module:     *module,
+		Version:    version,
+		Build:      *build,
+		Channel:    *channel,
+		Signing:    *signing,
+		SkipTests:  *skipTests,
+		IncludeAPK: *includeAPK,
+	})
+	if err != nil {
+		return err
+	}
+	return executeCommands(commands, *dryRun, stdout)
+}
+
+func runMobilePackageIOS(args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("mobile package ios", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	projectPath := fs.String("project", "apps/ios/emsi_ios.xcodeproj", "Xcode project path")
+	scheme := fs.String("scheme", "emsi_ios", "Xcode scheme")
+	configuration := fs.String("configuration", "Release", "Xcode build configuration")
+	versionInput := fs.String("version", "", "iOS MARKETING_VERSION semantic version")
+	build := fs.String("build", "", "iOS CURRENT_PROJECT_VERSION build number")
+	archivePath := fs.String("archive-path", "", "xcarchive output path")
+	exportPath := fs.String("export-path", "", "IPA export output directory")
+	exportOptions := fs.String("export-options", "apps/ios/release/ExportOptions-app-store.plist", "App Store export options plist")
+	archiveDestination := fs.String("archive-destination", "generic/platform=iOS", "xcodebuild archive destination")
+	testDestination := fs.String("test-destination", "platform=iOS Simulator,name=iPhone 17", "xcodebuild test destination")
+	skipTesting := fs.String("skip-testing", "emsi_iosUITests", "optional xcodebuild -skip-testing target")
+	skipTests := fs.Bool("skip-tests", false, "skip iOS unit tests")
+	allowProvisioningUpdates := fs.Bool("allow-provisioning-updates", false, "allow Xcode to update signing assets")
+	dryRun := fs.Bool("dry-run", false, "print commands without running them")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *versionInput == "" || *build == "" {
+		return fmt.Errorf("missing required flags: --version and --build are required")
+	}
+
+	version, err := release.ParseVersion(*versionInput)
+	if err != nil {
+		return err
+	}
+	releaseID := version.String() + "+" + *build
+	if *archivePath == "" {
+		*archivePath = filepath.Join("build", "releases", "ios", releaseID, *scheme+".xcarchive")
+	}
+	if *exportPath == "" {
+		*exportPath = filepath.Join("build", "releases", "ios", releaseID, "export")
+	}
+
+	commands, err := release.IOSPackageCommands(release.IOSPackageOptions{
+		ProjectPath:              *projectPath,
+		Scheme:                   *scheme,
+		Configuration:            *configuration,
+		Version:                  version,
+		Build:                    *build,
+		ArchivePath:              *archivePath,
+		ExportPath:               *exportPath,
+		ExportOptions:            *exportOptions,
+		ArchiveDest:              *archiveDestination,
+		TestDestination:          *testDestination,
+		SkipTesting:              *skipTesting,
+		SkipTests:                *skipTests,
+		AllowProvisioningUpdates: *allowProvisioningUpdates,
+	})
+	if err != nil {
+		return err
+	}
+	if !*dryRun {
+		if err := os.MkdirAll(filepath.Dir(*archivePath), 0o755); err != nil {
+			return err
+		}
+		if err := os.MkdirAll(*exportPath, 0o755); err != nil {
+			return err
+		}
+	}
+	return executeCommands(commands, *dryRun, stdout)
+}
+
 func splitCSV(input string) []string {
 	parts := strings.Split(input, ",")
 	values := make([]string, 0, len(parts))
@@ -174,4 +307,22 @@ func writeOutput(path string, data []byte, stdout io.Writer) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0o644)
+}
+
+func executeCommands(commands []release.Command, dryRun bool, stdout io.Writer) error {
+	for _, command := range commands {
+		fmt.Fprintln(stdout, command.String())
+		if dryRun {
+			continue
+		}
+		process := exec.Command(command.Name, command.Args...)
+		process.Dir = command.Dir
+		process.Stdin = os.Stdin
+		process.Stdout = os.Stdout
+		process.Stderr = os.Stderr
+		if err := process.Run(); err != nil {
+			return fmt.Errorf("run %s: %w", command.String(), err)
+		}
+	}
+	return nil
 }

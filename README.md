@@ -25,7 +25,27 @@ mobile-release bump --current 1.4.2 --level minor
 mobile-release changelog --repo . --from v1.4.2 --to HEAD --version 1.5.0 --output RELEASE_NOTES.md
 mobile-release hash --file build/app-release.aab
 mobile-release manifest --platform android --version 1.5.0 --build 105 --artifact build/app-release.aab --notes RELEASE_NOTES.md --output release-manifest.json
+mobile-release mobile package android --version 1.5.0 --build 105 --channel production
+mobile-release mobile package ios --version 1.5.0 --build 105 --export-options apps/ios/release/ExportOptions-app-store.plist --allow-provisioning-updates
 ```
+
+The mobile package commands invoke the native platform toolchains:
+
+- Android uses Gradle `:app:bundleRelease` and the app's release signing
+  configuration to produce a signed `.aab`.
+- iOS uses `xcodebuild archive` and `xcodebuild -exportArchive` with an export
+  options plist to produce a signed `.ipa`.
+
+Android signing defaults to `--signing env`, which requires:
+
+- `EMSI_ANDROID_RELEASE_STORE_FILE`
+- `EMSI_ANDROID_RELEASE_STORE_PASSWORD`
+- `EMSI_ANDROID_RELEASE_KEY_ALIAS`
+- `EMSI_ANDROID_RELEASE_KEY_PASSWORD`
+
+Use `--signing external` when Gradle properties or CI secrets provide signing.
+Use `--signing unsigned` only for local QA artifacts that will not be uploaded
+to Google Play.
 
 ## Installation
 
