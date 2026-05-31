@@ -12,13 +12,13 @@ import (
 	"github.com/MarlonJD/mobile-release-tools/pkg/release"
 )
 
-const usage = `emsi-release manages mobile release metadata.
+const usage = `mobile-release manages mobile release metadata.
 
 Usage:
-  emsi-release bump --current 1.4.2 --level patch|minor|major
-  emsi-release changelog --repo . --from v1.4.2 --to HEAD --version 1.4.3 [--output RELEASE_NOTES.md]
-  emsi-release hash --file path/to/artifact
-  emsi-release manifest --platform ios|android --version 1.4.3 --build 104 --artifact path [--notes RELEASE_NOTES.md] [--output manifest.json]
+  mobile-release bump --current 1.4.2 --level patch|minor|major
+  mobile-release changelog --repo . --from v1.4.2 --to HEAD --version 1.4.3 [--output RELEASE_NOTES.md]
+  mobile-release hash --file path/to/artifact
+  mobile-release manifest --platform ios|android --version 1.4.3 --build 104 --artifact path [--notes RELEASE_NOTES.md] [--output manifest.json]
 `
 
 func main() {

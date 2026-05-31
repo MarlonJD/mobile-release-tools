@@ -21,10 +21,10 @@ to native toolchains.
 ## Commands
 
 ```bash
-emsi-release bump --current 1.4.2 --level minor
-emsi-release changelog --repo . --from v1.4.2 --to HEAD --version 1.5.0 --output RELEASE_NOTES.md
-emsi-release hash --file build/app-release.aab
-emsi-release manifest --platform android --version 1.5.0 --build 105 --artifact build/app-release.aab --notes RELEASE_NOTES.md --output release-manifest.json
+mobile-release bump --current 1.4.2 --level minor
+mobile-release changelog --repo . --from v1.4.2 --to HEAD --version 1.5.0 --output RELEASE_NOTES.md
+mobile-release hash --file build/app-release.aab
+mobile-release manifest --platform android --version 1.5.0 --build 105 --artifact build/app-release.aab --notes RELEASE_NOTES.md --output release-manifest.json
 ```
 
 ## Installation

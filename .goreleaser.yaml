@@ -1,15 +1,15 @@
 version: 2
 
-project_name: emsi-release
+project_name: mobile-release
 
 before:
   hooks:
     - go mod tidy
 
 builds:
-  - id: emsi-release
-    main: ./cmd/emsi-release
-    binary: emsi-release
+  - id: mobile-release
+    main: ./cmd/mobile-release
+    binary: mobile-release
     env:
       - CGO_ENABLED=0
     goos:
@@ -23,7 +23,7 @@ builds:
 archives:
   - id: default
     builds:
-      - emsi-release
+      - mobile-release
     name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
@@ -47,7 +47,7 @@ changelog:
   disable: true
 
 brews:
-  - name: emsi-release
+  - name: mobile-release
     repository:
       owner: MarlonJD
       name: homebrew-tap
@@ -56,12 +56,12 @@ brews:
     description: Local-first mobile release CLI for iOS and Android
     license: GPL-3.0-or-later
     install: |
-      bin.install "emsi-release"
+      bin.install "mobile-release"
     test: |
-      system "#{bin}/emsi-release", "--help"
+      system "#{bin}/mobile-release", "--help"
 
 scoops:
-  - name: emsi-release
+  - name: mobile-release
     repository:
       owner: MarlonJD
       name: scoop-bucket
@@ -71,7 +71,7 @@ scoops:
 
 nfpms:
   - id: packages
-    package_name: emsi-release
+    package_name: mobile-release
     vendor: MarlonJD
     homepage: https://github.com/MarlonJD/mobile-release-tools
     maintainer: marlonjd <burak.karahan@mail.ru>
