@@ -46,10 +46,16 @@ Windows, while platform-specific packaging stays delegated to Xcode and Gradle.
 
 ## Install
 
-Until a tagged release is published, install from source:
+Homebrew:
 
 ```bash
-go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@latest
+brew install marlonjd/tap/mobile-release
+```
+
+Pinned source install:
+
+```bash
+go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.0
 ```
 
 Or clone and run directly:
