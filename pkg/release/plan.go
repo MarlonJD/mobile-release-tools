@@ -7,6 +7,10 @@ type ReleasePlanOptions struct {
 	FromRef         string
 	ToRef           string
 	TagPrefix       string
+	CurrentVersion  Version
+	CurrentBuild    string
+	VersionSource   string
+	BuildSource     string
 	VersionOverride string
 	BuildOverride   string
 }
@@ -14,12 +18,15 @@ type ReleasePlanOptions struct {
 type ReleasePlan struct {
 	PreviousRef       string
 	CurrentVersion    Version
+	CurrentBuild      string
 	Version           Version
 	Build             string
 	ReleaseID         string
 	BumpLevel         BumpLevel
 	BumpReason        string
 	Commits           []Commit
+	VersionSource     string
+	BuildSource       string
 	UsedVersionFlag   bool
 	UsedBuildFlag     bool
 	NoPreviousRelease bool
@@ -36,26 +43,20 @@ func PlanNextRelease(options ReleasePlanOptions) (ReleasePlan, error) {
 		options.TagPrefix = "v"
 	}
 
-	var current Version
+	current := options.CurrentVersion
 	var previousRef string
 	noPrevious := false
 	if options.FromRef != "" {
 		previousRef = options.FromRef
-		parsed, err := ParseVersionFromTag(options.FromRef, options.TagPrefix)
-		if err == nil {
-			current = parsed
-		}
 	} else {
-		tag, version, ok, err := LatestVersionTag(options.RepoPath, options.TagPrefix)
+		tag, _, ok, err := LatestVersionTag(options.RepoPath, options.TagPrefix)
 		if err != nil {
 			return ReleasePlan{}, err
 		}
 		if ok {
 			previousRef = tag
-			current = version
 		} else {
 			noPrevious = true
-			current = Version{}
 		}
 	}
 
@@ -82,25 +83,33 @@ func PlanNextRelease(options ReleasePlanOptions) (ReleasePlan, error) {
 	build := options.BuildOverride
 	usedBuildFlag := build != ""
 	if build == "" {
-		build = nextBuildNumber(current)
+		build = nextBuildNumber(options.CurrentBuild)
 		if build == "" {
-			count, err := GitCommitCount(options.RepoPath, options.ToRef)
-			if err != nil {
-				return ReleasePlan{}, err
+			if current.BuildMetadata != "" {
+				build = nextBuildNumber(current.BuildMetadata)
 			}
-			build = strconv.Itoa(count)
+			if build == "" {
+				count, err := GitCommitCount(options.RepoPath, options.ToRef)
+				if err != nil {
+					return ReleasePlan{}, err
+				}
+				build = strconv.Itoa(count)
+			}
 		}
 	}
 
 	return ReleasePlan{
 		PreviousRef:       previousRef,
 		CurrentVersion:    current,
+		CurrentBuild:      options.CurrentBuild,
 		Version:           next,
 		Build:             build,
 		ReleaseID:         next.String() + "+" + build,
 		BumpLevel:         level,
 		BumpReason:        reason,
 		Commits:           commits,
+		VersionSource:     options.VersionSource,
+		BuildSource:       options.BuildSource,
 		UsedVersionFlag:   usedVersionFlag,
 		UsedBuildFlag:     usedBuildFlag,
 		NoPreviousRelease: noPrevious,
@@ -134,11 +143,11 @@ func ParseVersionFromTag(tag, tagPrefix string) (Version, error) {
 	return ParseVersion(tag)
 }
 
-func nextBuildNumber(current Version) string {
-	if current.BuildMetadata == "" {
+func nextBuildNumber(current string) string {
+	if current == "" {
 		return ""
 	}
-	value, err := strconv.Atoi(current.BuildMetadata)
+	value, err := strconv.Atoi(current)
 	if err != nil {
 		return ""
 	}

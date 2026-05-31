@@ -94,7 +94,7 @@ For Windows, unzip the matching `.zip` archive and put `mobile-release.exe` on
 Use the Go path only when package-manager or archive install is not available:
 
 ```bash
-go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.2.0
+go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.2.1
 ```
 
 Make sure Go's binary directory is on `PATH`.

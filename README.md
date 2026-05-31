@@ -47,7 +47,7 @@ windows/amd64, windows/arm64
 Any platform with Go installed:
 
 ```bash
-go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.2.0
+go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.2.1
 ```
 
 Verify:
@@ -114,7 +114,7 @@ brew install --cask marlonjd/tap/mobile-release
 Pinned source install with Go:
 
 ```bash
-go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.2.0
+go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.2.1
 ```
 
 Or clone and run directly:
@@ -219,9 +219,12 @@ build/releases/ios/<version>+<build>/
   release-manifest.json
 ```
 
-The version and build are calculated automatically from git tags and
-Conventional Commits. Use `--dry-run` to print the commands and final upload
-summary without running Xcode.
+The current version and build are read from the Xcode project file
+(`MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`). The next version is
+calculated from Conventional Commits, and the next build increments the current
+project build. Git tags are used only to find the changelog range. Use
+`--dry-run` to print the commands and final upload summary without running
+Xcode.
 
 ## Android Setup From Scratch
 
@@ -272,6 +275,10 @@ build/releases/android/<version>+<build>/RELEASE_NOTES.md
 build/releases/android/<version>+<build>/release-manifest.json
 ```
 
+The current version and build are read from `apps/android/app/build.gradle.kts`
+by default. Use `--build-file` when the app keeps `versionName` and
+`versionCode` in another Gradle file.
+
 Signing modes:
 
 - `--signing env`: default; requires all `EMSI_ANDROID_RELEASE_*` variables.
@@ -297,9 +304,11 @@ Use `--include-apk` to also run `:app:assembleRelease` for QA builds. Use
 
 The package command automatically:
 
-- Finds the latest SemVer git tag, using the `v` prefix by default.
+- Reads the current app version/build from the platform project file.
+- Finds the latest SemVer git tag, using the `v` prefix by default, only for
+  the changelog range.
 - Infers the next SemVer bump from Conventional Commits.
-- Computes the platform build number.
+- Computes the next platform build number from the current platform build.
 - Passes the computed version/build into Gradle or Xcode.
 - Writes `RELEASE_NOTES.md`.
 - Writes `release-manifest.json` with artifact SHA-256 hashes and sizes.
@@ -318,7 +327,7 @@ mobile-release bump --current 1.4.2 --level patch|minor|major
 mobile-release changelog --repo . --from v1.4.2 --to HEAD --version 1.4.3 --output RELEASE_NOTES.md
 mobile-release hash --file path/to/artifact
 mobile-release manifest --platform ios|android --version 1.4.3 --build 104 --artifact path --notes RELEASE_NOTES.md --output manifest.json
-mobile-release package android --channel production
+mobile-release package android --channel production [--build-file apps/android/app/build.gradle.kts]
 mobile-release package ios --export-options apps/ios/release/ExportOptions-app-store.plist
 ```
 
@@ -356,15 +365,18 @@ Example release id:
 
 Automatic package versioning uses these rules:
 
+- Current iOS version/build are read from
+  `apps/ios/emsi_ios.xcodeproj/project.pbxproj` by default.
+- Current Android version/build are read from `apps/android/app/build.gradle.kts`
+  by default.
+- Git tags do not define the active app version. They define the previous
+  release point for changelog generation.
 - `BREAKING CHANGE` or `!`: major bump.
 - `feat`: minor bump.
 - `fix`, `perf`, or `security`: patch bump.
 - Internal-only commits default to patch when packaging is explicitly
   requested.
-- If the previous tag includes numeric build metadata, for example
-  `v1.4.2+104`, the next build is `105`.
-- If the previous tag has no build metadata, the build defaults to
-  `git rev-list --count HEAD`.
+- The next build is the current platform build plus one.
 
 Use `--version` or `--build` only for an explicit release-owner override.
 
@@ -390,9 +402,10 @@ The app version changed after export:
 
 - Keep `manageAppVersionAndBuildNumber` set to `false` in the export options
   plist.
-- Use the terminal summary from `mobile-release package ios` as the source of
-  truth. Pass `--version` or `--build` only when intentionally overriding the
-  automatic calculation.
+- Use the platform project file as the source of truth for the current version,
+  and use the terminal summary from `mobile-release package ios` for the
+  computed release candidate. Pass `--version` or `--build` only when
+  intentionally overriding the automatic calculation.
 
 ## License
 

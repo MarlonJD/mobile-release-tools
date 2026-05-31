@@ -194,6 +194,7 @@ func runMobilePackageAndroid(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("mobile package android", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	projectDir := fs.String("project", "apps/android", "Android project directory")
+	buildFile := fs.String("build-file", "", "Android Gradle build file used to read current version; defaults to <project>/app/build.gradle.kts")
 	gradle := fs.String("gradle", "./gradlew", "Gradle executable path relative to project")
 	module := fs.String("module", ":app", "Gradle app module path")
 	versionInput := fs.String("version", "", "Android versionName semantic version")
@@ -214,11 +215,22 @@ func runMobilePackageAndroid(args []string, stdout io.Writer) error {
 		return err
 	}
 
+	if *buildFile == "" {
+		*buildFile = filepath.Join(*projectDir, "app", "build.gradle.kts")
+	}
+	current, err := release.ReadAndroidVersion(*buildFile)
+	if err != nil && (*versionInput == "" || *build == "") {
+		return err
+	}
 	plan, err := release.PlanNextRelease(release.ReleasePlanOptions{
 		RepoPath:        *repo,
 		FromRef:         *from,
 		ToRef:           *to,
 		TagPrefix:       *tagPrefix,
+		CurrentVersion:  current.Version,
+		CurrentBuild:    current.Build,
+		VersionSource:   current.VersionSource,
+		BuildSource:     current.BuildSource,
 		VersionOverride: *versionInput,
 		BuildOverride:   *build,
 	})
@@ -290,11 +302,19 @@ func runMobilePackageIOS(args []string, stdout io.Writer) error {
 		return err
 	}
 
+	current, err := release.ReadIOSVersion(*projectPath)
+	if err != nil && (*versionInput == "" || *build == "") {
+		return err
+	}
 	plan, err := release.PlanNextRelease(release.ReleasePlanOptions{
 		RepoPath:        *repo,
 		FromRef:         *from,
 		ToRef:           *to,
 		TagPrefix:       *tagPrefix,
+		CurrentVersion:  current.Version,
+		CurrentBuild:    current.Build,
+		VersionSource:   current.VersionSource,
+		BuildSource:     current.BuildSource,
 		VersionOverride: *versionInput,
 		BuildOverride:   *build,
 	})
@@ -410,9 +430,19 @@ func printPackageSummary(options finishPackageOptions, manifest *release.Manifes
 	fmt.Fprintln(options.Stdout, status)
 	fmt.Fprintf(options.Stdout, "  Platform: %s\n", options.Platform)
 	if options.Plan.PreviousRef != "" {
-		fmt.Fprintf(options.Stdout, "  Previous release: %s\n", options.Plan.PreviousRef)
+		fmt.Fprintf(options.Stdout, "  Changelog from: %s\n", options.Plan.PreviousRef)
 	} else {
-		fmt.Fprintln(options.Stdout, "  Previous release: none")
+		fmt.Fprintln(options.Stdout, "  Changelog from: beginning of git history")
+	}
+	fmt.Fprintf(options.Stdout, "  Current version: %s\n", options.Plan.CurrentVersion.String())
+	if options.Plan.CurrentBuild != "" {
+		fmt.Fprintf(options.Stdout, "  Current build: %s\n", options.Plan.CurrentBuild)
+	}
+	if options.Plan.VersionSource != "" {
+		fmt.Fprintf(options.Stdout, "  Current version source: %s\n", options.Plan.VersionSource)
+	}
+	if options.Plan.BuildSource != "" {
+		fmt.Fprintf(options.Stdout, "  Current build source: %s\n", options.Plan.BuildSource)
 	}
 	fmt.Fprintf(options.Stdout, "  Version: %s\n", options.Plan.Version.String())
 	fmt.Fprintf(options.Stdout, "  Build: %s\n", options.Plan.Build)
