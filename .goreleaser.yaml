@@ -1,0 +1,83 @@
+version: 2
+
+project_name: emsi-release
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: emsi-release
+    main: ./cmd/emsi-release
+    binary: emsi-release
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: default
+    builds:
+      - emsi-release
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  disable: true
+
+brews:
+  - name: emsi-release
+    repository:
+      owner: MarlonJD
+      name: homebrew-tap
+    directory: Formula
+    homepage: https://github.com/MarlonJD/mobile-release-tools
+    description: Local-first mobile release CLI for iOS and Android
+    license: MIT
+    install: |
+      bin.install "emsi-release"
+    test: |
+      system "#{bin}/emsi-release", "--help"
+
+scoops:
+  - name: emsi-release
+    repository:
+      owner: MarlonJD
+      name: scoop-bucket
+    homepage: https://github.com/MarlonJD/mobile-release-tools
+    description: Local-first mobile release CLI for iOS and Android
+    license: MIT
+
+nfpms:
+  - id: packages
+    package_name: emsi-release
+    vendor: MarlonJD
+    homepage: https://github.com/MarlonJD/mobile-release-tools
+    maintainer: marlonjd <burak.karahan@mail.ru>
+    description: Local-first mobile release CLI for iOS and Android
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
