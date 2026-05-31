@@ -21,8 +21,8 @@ Usage:
   mobile-release changelog --repo . --from v1.4.2 --to HEAD --version 1.4.3 [--output RELEASE_NOTES.md]
   mobile-release hash --file path/to/artifact
   mobile-release manifest --platform ios|android --version 1.4.3 --build 104 --artifact path [--notes RELEASE_NOTES.md] [--output manifest.json]
-  mobile-release mobile package android --version 1.4.3 --build 1848 --channel production
-  mobile-release mobile package ios --version 1.4.3 --build 1848 --export-options apps/ios/release/ExportOptions-app-store.plist
+  mobile-release package android --channel production
+  mobile-release package ios --export-options apps/ios/release/ExportOptions-app-store.plist
 `
 
 func main() {
@@ -47,6 +47,8 @@ func run(args []string, stdout io.Writer) error {
 		return runHash(args[1:], stdout)
 	case "manifest":
 		return runManifest(args[1:], stdout)
+	case "package":
+		return runPackage(args[1:], stdout)
 	case "mobile":
 		return runMobile(args[1:], stdout)
 	default:
@@ -62,13 +64,21 @@ func runMobile(args []string, stdout io.Writer) error {
 		return fmt.Errorf("unknown mobile command %q; supported command: package", args[0])
 	}
 
-	switch args[1] {
+	return runPackage(args[1:], stdout)
+}
+
+func runPackage(args []string, stdout io.Writer) error {
+	if len(args) < 1 {
+		return fmt.Errorf("usage: mobile-release package ios|android")
+	}
+
+	switch args[0] {
 	case "android":
-		return runMobilePackageAndroid(args[2:], stdout)
+		return runMobilePackageAndroid(args[1:], stdout)
 	case "ios":
-		return runMobilePackageIOS(args[2:], stdout)
+		return runMobilePackageIOS(args[1:], stdout)
 	default:
-		return fmt.Errorf("unknown mobile package platform %q; expected ios or android", args[1])
+		return fmt.Errorf("unknown package platform %q; expected ios or android", args[0])
 	}
 }
 
@@ -188,19 +198,30 @@ func runMobilePackageAndroid(args []string, stdout io.Writer) error {
 	module := fs.String("module", ":app", "Gradle app module path")
 	versionInput := fs.String("version", "", "Android versionName semantic version")
 	build := fs.String("build", "", "Android versionCode")
+	repo := fs.String("repo", ".", "git repository path used for automatic version calculation")
+	from := fs.String("from", "", "previous release tag or commit; defaults to latest SemVer tag")
+	to := fs.String("to", "HEAD", "target release ref used for automatic version calculation")
+	tagPrefix := fs.String("tag-prefix", "v", "release tag prefix used for automatic version calculation")
 	channel := fs.String("channel", "production", "distribution channel")
 	signing := fs.String("signing", release.AndroidSigningEnv, "signing source: env, external, or unsigned")
+	notesOutput := fs.String("notes-output", "", "release notes output path; defaults to build/releases/android/<version+build>/RELEASE_NOTES.md")
+	manifestOutput := fs.String("manifest-output", "", "release manifest output path; defaults to build/releases/android/<version+build>/release-manifest.json")
+	uploadDestination := fs.String("upload-destination", "Google Play Console", "human-readable upload destination printed after packaging")
 	skipTests := fs.Bool("skip-tests", false, "skip Android unit tests")
 	includeAPK := fs.Bool("include-apk", false, "also build release APK for QA")
 	dryRun := fs.Bool("dry-run", false, "print commands without running them")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *versionInput == "" || *build == "" {
-		return fmt.Errorf("missing required flags: --version and --build are required")
-	}
 
-	version, err := release.ParseVersion(*versionInput)
+	plan, err := release.PlanNextRelease(release.ReleasePlanOptions{
+		RepoPath:        *repo,
+		FromRef:         *from,
+		ToRef:           *to,
+		TagPrefix:       *tagPrefix,
+		VersionOverride: *versionInput,
+		BuildOverride:   *build,
+	})
 	if err != nil {
 		return err
 	}
@@ -211,8 +232,8 @@ func runMobilePackageAndroid(args []string, stdout io.Writer) error {
 		ProjectDir: *projectDir,
 		Gradle:     *gradle,
 		Module:     *module,
-		Version:    version,
-		Build:      *build,
+		Version:    plan.Version,
+		Build:      plan.Build,
 		Channel:    *channel,
 		Signing:    *signing,
 		SkipTests:  *skipTests,
@@ -221,7 +242,24 @@ func runMobilePackageAndroid(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return executeCommands(commands, *dryRun, stdout)
+	if err := executeCommands(commands, *dryRun, stdout); err != nil {
+		return err
+	}
+
+	releaseDir := filepath.Join("build", "releases", "android", plan.ReleaseID)
+	notesPath, manifestPath := releaseMetadataPaths(releaseDir, *notesOutput, *manifestOutput)
+	artifacts := androidArtifactPaths(*projectDir, *includeAPK, *dryRun)
+	return finishPackage(finishPackageOptions{
+		Platform:          "android",
+		Plan:              plan,
+		Artifacts:         artifacts,
+		ReleaseDir:        releaseDir,
+		NotesPath:         notesPath,
+		ManifestPath:      manifestPath,
+		UploadDestination: *uploadDestination,
+		DryRun:            *dryRun,
+		Stdout:            stdout,
+	})
 }
 
 func runMobilePackageIOS(args []string, stdout io.Writer) error {
@@ -232,9 +270,16 @@ func runMobilePackageIOS(args []string, stdout io.Writer) error {
 	configuration := fs.String("configuration", "Release", "Xcode build configuration")
 	versionInput := fs.String("version", "", "iOS MARKETING_VERSION semantic version")
 	build := fs.String("build", "", "iOS CURRENT_PROJECT_VERSION build number")
+	repo := fs.String("repo", ".", "git repository path used for automatic version calculation")
+	from := fs.String("from", "", "previous release tag or commit; defaults to latest SemVer tag")
+	to := fs.String("to", "HEAD", "target release ref used for automatic version calculation")
+	tagPrefix := fs.String("tag-prefix", "v", "release tag prefix used for automatic version calculation")
 	archivePath := fs.String("archive-path", "", "xcarchive output path")
 	exportPath := fs.String("export-path", "", "IPA export output directory")
 	exportOptions := fs.String("export-options", "apps/ios/release/ExportOptions-app-store.plist", "App Store export options plist")
+	notesOutput := fs.String("notes-output", "", "release notes output path; defaults to build/releases/ios/<version+build>/RELEASE_NOTES.md")
+	manifestOutput := fs.String("manifest-output", "", "release manifest output path; defaults to build/releases/ios/<version+build>/release-manifest.json")
+	uploadDestination := fs.String("upload-destination", "App Store Connect", "human-readable upload destination printed after packaging")
 	archiveDestination := fs.String("archive-destination", "generic/platform=iOS", "xcodebuild archive destination")
 	testDestination := fs.String("test-destination", "platform=iOS Simulator,name=iPhone 17", "xcodebuild test destination")
 	skipTesting := fs.String("skip-testing", "emsi_iosUITests", "optional xcodebuild -skip-testing target")
@@ -244,28 +289,31 @@ func runMobilePackageIOS(args []string, stdout io.Writer) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *versionInput == "" || *build == "" {
-		return fmt.Errorf("missing required flags: --version and --build are required")
-	}
 
-	version, err := release.ParseVersion(*versionInput)
+	plan, err := release.PlanNextRelease(release.ReleasePlanOptions{
+		RepoPath:        *repo,
+		FromRef:         *from,
+		ToRef:           *to,
+		TagPrefix:       *tagPrefix,
+		VersionOverride: *versionInput,
+		BuildOverride:   *build,
+	})
 	if err != nil {
 		return err
 	}
-	releaseID := version.String() + "+" + *build
 	if *archivePath == "" {
-		*archivePath = filepath.Join("build", "releases", "ios", releaseID, *scheme+".xcarchive")
+		*archivePath = filepath.Join("build", "releases", "ios", plan.ReleaseID, *scheme+".xcarchive")
 	}
 	if *exportPath == "" {
-		*exportPath = filepath.Join("build", "releases", "ios", releaseID, "export")
+		*exportPath = filepath.Join("build", "releases", "ios", plan.ReleaseID, "export")
 	}
 
 	commands, err := release.IOSPackageCommands(release.IOSPackageOptions{
 		ProjectPath:              *projectPath,
 		Scheme:                   *scheme,
 		Configuration:            *configuration,
-		Version:                  version,
-		Build:                    *build,
+		Version:                  plan.Version,
+		Build:                    plan.Build,
 		ArchivePath:              *archivePath,
 		ExportPath:               *exportPath,
 		ExportOptions:            *exportOptions,
@@ -286,7 +334,140 @@ func runMobilePackageIOS(args []string, stdout io.Writer) error {
 			return err
 		}
 	}
-	return executeCommands(commands, *dryRun, stdout)
+	if err := executeCommands(commands, *dryRun, stdout); err != nil {
+		return err
+	}
+
+	releaseDir := filepath.Join("build", "releases", "ios", plan.ReleaseID)
+	notesPath, manifestPath := releaseMetadataPaths(releaseDir, *notesOutput, *manifestOutput)
+	artifacts := iosArtifactPaths(*exportPath, *dryRun)
+	return finishPackage(finishPackageOptions{
+		Platform:          "ios",
+		Plan:              plan,
+		Artifacts:         artifacts,
+		ReleaseDir:        releaseDir,
+		NotesPath:         notesPath,
+		ManifestPath:      manifestPath,
+		UploadDestination: *uploadDestination,
+		DryRun:            *dryRun,
+		Stdout:            stdout,
+	})
+}
+
+type finishPackageOptions struct {
+	Platform          string
+	Plan              release.ReleasePlan
+	Artifacts         []string
+	ReleaseDir        string
+	NotesPath         string
+	ManifestPath      string
+	UploadDestination string
+	DryRun            bool
+	Stdout            io.Writer
+}
+
+func finishPackage(options finishPackageOptions) error {
+	notes := release.GenerateChangelog(options.Plan.Version.String(), time.Now().UTC(), options.Plan.Commits, release.ChangelogOptions{})
+	if options.DryRun {
+		printPackageSummary(options, nil)
+		return nil
+	}
+
+	if err := os.MkdirAll(options.ReleaseDir, 0o755); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(options.NotesPath), 0o755); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(options.ManifestPath), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(options.NotesPath, []byte(notes), 0o644); err != nil {
+		return err
+	}
+	manifest, err := release.NewManifest(options.Platform, options.Plan.Version, options.Plan.Build, options.Artifacts, notes, time.Now().UTC())
+	if err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	if err := os.WriteFile(options.ManifestPath, data, 0o644); err != nil {
+		return err
+	}
+	printPackageSummary(options, &manifest)
+	return nil
+}
+
+func printPackageSummary(options finishPackageOptions, manifest *release.Manifest) {
+	status := "Release package complete"
+	if options.DryRun {
+		status = "Release package dry run"
+	}
+	fmt.Fprintln(options.Stdout)
+	fmt.Fprintln(options.Stdout, status)
+	fmt.Fprintf(options.Stdout, "  Platform: %s\n", options.Platform)
+	if options.Plan.PreviousRef != "" {
+		fmt.Fprintf(options.Stdout, "  Previous release: %s\n", options.Plan.PreviousRef)
+	} else {
+		fmt.Fprintln(options.Stdout, "  Previous release: none")
+	}
+	fmt.Fprintf(options.Stdout, "  Version: %s\n", options.Plan.Version.String())
+	fmt.Fprintf(options.Stdout, "  Build: %s\n", options.Plan.Build)
+	fmt.Fprintf(options.Stdout, "  Release ID: %s\n", options.Plan.ReleaseID)
+	fmt.Fprintf(options.Stdout, "  Bump: %s (%s)\n", options.Plan.BumpLevel, options.Plan.BumpReason)
+	if options.Plan.UsedVersionFlag || options.Plan.UsedBuildFlag {
+		fmt.Fprintln(options.Stdout, "  Override: manual version/build flag used")
+	}
+	fmt.Fprintf(options.Stdout, "  Release notes: %s\n", options.NotesPath)
+	fmt.Fprintf(options.Stdout, "  Manifest: %s\n", options.ManifestPath)
+	fmt.Fprintf(options.Stdout, "  Upload destination: %s\n", options.UploadDestination)
+	if manifest == nil {
+		for _, artifact := range options.Artifacts {
+			fmt.Fprintf(options.Stdout, "  Upload artifact: %s\n", artifact)
+		}
+		return
+	}
+	for _, artifact := range manifest.Artifacts {
+		fmt.Fprintf(options.Stdout, "  Upload artifact: %s\n", artifact.Path)
+		fmt.Fprintf(options.Stdout, "    SHA-256: %s\n", artifact.SHA256)
+	}
+}
+
+func releaseMetadataPaths(releaseDir, notesOutput, manifestOutput string) (string, string) {
+	if notesOutput == "" {
+		notesOutput = filepath.Join(releaseDir, "RELEASE_NOTES.md")
+	}
+	if manifestOutput == "" {
+		manifestOutput = filepath.Join(releaseDir, "release-manifest.json")
+	}
+	return notesOutput, manifestOutput
+}
+
+func androidArtifactPaths(projectDir string, includeAPK bool, dryRun bool) []string {
+	aabPattern := filepath.Join(projectDir, "app", "build", "outputs", "bundle", "release", "*.aab")
+	paths := globOrDefault(aabPattern, filepath.Join(projectDir, "app", "build", "outputs", "bundle", "release", "app-release.aab"), dryRun)
+	if includeAPK {
+		apkPattern := filepath.Join(projectDir, "app", "build", "outputs", "apk", "release", "*.apk")
+		paths = append(paths, globOrDefault(apkPattern, filepath.Join(projectDir, "app", "build", "outputs", "apk", "release", "app-release.apk"), dryRun)...)
+	}
+	return paths
+}
+
+func iosArtifactPaths(exportPath string, dryRun bool) []string {
+	return globOrDefault(filepath.Join(exportPath, "*.ipa"), filepath.Join(exportPath, "*.ipa"), dryRun)
+}
+
+func globOrDefault(pattern, fallback string, dryRun bool) []string {
+	if !dryRun {
+		matches, err := filepath.Glob(pattern)
+		if err == nil && len(matches) > 0 {
+			return matches
+		}
+	}
+	return []string{fallback}
 }
 
 func splitCSV(input string) []string {

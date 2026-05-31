@@ -47,7 +47,7 @@ windows/amd64, windows/arm64
 Any platform with Go installed:
 
 ```bash
-go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.1
+go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.2.0
 ```
 
 Verify:
@@ -114,7 +114,7 @@ brew install --cask marlonjd/tap/mobile-release
 Pinned source install with Go:
 
 ```bash
-go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.1
+go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.2.0
 ```
 
 Or clone and run directly:
@@ -194,11 +194,9 @@ Replace `YOUR_TEAM_ID` with the Apple Developer Team ID used by the app target.
 Package a signed `.ipa`:
 
 ```bash
-mobile-release mobile package ios \
+mobile-release package ios \
   --project apps/ios/emsi_ios.xcodeproj \
   --scheme emsi_ios \
-  --version 1.5.0 \
-  --build 105 \
   --export-options apps/ios/release/ExportOptions-app-store.plist \
   --allow-provisioning-updates
 ```
@@ -214,12 +212,16 @@ xcodebuild -exportArchive ...
 Default output:
 
 ```text
-build/releases/ios/1.5.0+105/
+build/releases/ios/<version>+<build>/
   emsi_ios.xcarchive
   export/*.ipa
+  RELEASE_NOTES.md
+  release-manifest.json
 ```
 
-Use `--dry-run` to print the commands without running Xcode.
+The version and build are calculated automatically from git tags and
+Conventional Commits. Use `--dry-run` to print the commands and final upload
+summary without running Xcode.
 
 ## Android Setup From Scratch
 
@@ -247,10 +249,8 @@ export EMSI_ANDROID_RELEASE_KEY_PASSWORD=...
 Package a signed `.aab`:
 
 ```bash
-mobile-release mobile package android \
+mobile-release package android \
   --project apps/android \
-  --version 1.5.0 \
-  --build 105 \
   --channel production
 ```
 
@@ -259,8 +259,8 @@ What this runs:
 ```bash
 ./gradlew :app:testDebugUnitTest
 ./gradlew :app:bundleRelease \
-  -Pemsi.versionName=1.5.0 \
-  -Pemsi.versionCode=105 \
+  -Pemsi.versionName=<computed-version> \
+  -Pemsi.versionCode=<computed-build> \
   -Pemsi.distributionChannel=production
 ```
 
@@ -268,6 +268,8 @@ Default Gradle output:
 
 ```text
 apps/android/app/build/outputs/bundle/release/app-release.aab
+build/releases/android/<version>+<build>/RELEASE_NOTES.md
+build/releases/android/<version>+<build>/release-manifest.json
 ```
 
 Signing modes:
@@ -283,56 +285,27 @@ Use `--include-apk` to also run `:app:assembleRelease` for QA builds. Use
 
 ## Release Flow
 
-1. Decide the next version:
+1. Build the platform artifact:
 
    ```bash
-   mobile-release bump --current 1.4.2 --level minor
-   ```
-
-2. Generate release notes from Conventional Commits:
-
-   ```bash
-   mobile-release changelog \
-     --repo . \
-     --from v1.4.2 \
-     --to HEAD \
-     --version 1.5.0 \
-     --output RELEASE_NOTES.md
-   ```
-
-3. Build the platform artifact:
-
-   ```bash
-   mobile-release mobile package android --version 1.5.0 --build 105 --channel production
+   mobile-release package android --channel production
    ```
 
    ```bash
-   mobile-release mobile package ios --version 1.5.0 --build 105 --export-options apps/ios/release/ExportOptions-app-store.plist --allow-provisioning-updates
+   mobile-release package ios --export-options apps/ios/release/ExportOptions-app-store.plist --allow-provisioning-updates
    ```
 
-4. Hash the artifact:
+The package command automatically:
 
-   ```bash
-   mobile-release hash --file apps/android/app/build/outputs/bundle/release/app-release.aab
-   ```
+- Finds the latest SemVer git tag, using the `v` prefix by default.
+- Infers the next SemVer bump from Conventional Commits.
+- Computes the platform build number.
+- Passes the computed version/build into Gradle or Xcode.
+- Writes `RELEASE_NOTES.md`.
+- Writes `release-manifest.json` with artifact SHA-256 hashes and sizes.
+- Prints the upload destination and artifact path at the end.
 
-   ```bash
-   mobile-release hash --file build/releases/ios/1.5.0+105/export/App.ipa
-   ```
-
-5. Write a release manifest:
-
-   ```bash
-   mobile-release manifest \
-     --platform android \
-     --version 1.5.0 \
-     --build 105 \
-     --artifact apps/android/app/build/outputs/bundle/release/app-release.aab \
-     --notes RELEASE_NOTES.md \
-     --output release-manifest.android.json
-   ```
-
-6. Upload manually:
+2. Upload the artifact listed in the terminal summary:
 
    - Android `.aab` to Google Play Console.
    - iOS `.ipa` to App Store Connect through Xcode Organizer, Transporter, or
@@ -345,8 +318,8 @@ mobile-release bump --current 1.4.2 --level patch|minor|major
 mobile-release changelog --repo . --from v1.4.2 --to HEAD --version 1.4.3 --output RELEASE_NOTES.md
 mobile-release hash --file path/to/artifact
 mobile-release manifest --platform ios|android --version 1.4.3 --build 104 --artifact path --notes RELEASE_NOTES.md --output manifest.json
-mobile-release mobile package android --version 1.4.3 --build 104 --channel production
-mobile-release mobile package ios --version 1.4.3 --build 104 --export-options apps/ios/release/ExportOptions-app-store.plist
+mobile-release package android --channel production
+mobile-release package ios --export-options apps/ios/release/ExportOptions-app-store.plist
 ```
 
 ## Changelog Policy
@@ -381,6 +354,20 @@ Example release id:
 1.5.0+105
 ```
 
+Automatic package versioning uses these rules:
+
+- `BREAKING CHANGE` or `!`: major bump.
+- `feat`: minor bump.
+- `fix`, `perf`, or `security`: patch bump.
+- Internal-only commits default to patch when packaging is explicitly
+  requested.
+- If the previous tag includes numeric build metadata, for example
+  `v1.4.2+104`, the next build is `105`.
+- If the previous tag has no build metadata, the build defaults to
+  `git rev-list --count HEAD`.
+
+Use `--version` or `--build` only for an explicit release-owner override.
+
 ## Troubleshooting
 
 Android signing error:
@@ -403,8 +390,9 @@ The app version changed after export:
 
 - Keep `manageAppVersionAndBuildNumber` set to `false` in the export options
   plist.
-- Pass `--version` and `--build` explicitly to `mobile-release mobile package
-  ios`.
+- Use the terminal summary from `mobile-release package ios` as the source of
+  truth. Pass `--version` or `--build` only when intentionally overriding the
+  automatic calculation.
 
 ## License
 

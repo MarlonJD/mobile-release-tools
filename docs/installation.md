@@ -94,7 +94,7 @@ For Windows, unzip the matching `.zip` archive and put `mobile-release.exe` on
 Use the Go path only when package-manager or archive install is not available:
 
 ```bash
-go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.1
+go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.2.0
 ```
 
 Make sure Go's binary directory is on `PATH`.
@@ -123,8 +123,8 @@ The command should print support for:
 - `changelog`
 - `hash`
 - `manifest`
-- `mobile package android`
-- `mobile package ios`
+- `package android`
+- `package ios`
 
 ## Maintainer Release Prerequisites
 
@@ -154,8 +154,8 @@ secrets:
 2. Create and push a SemVer tag:
 
    ```bash
-   git tag v0.1.1
-   git push origin v0.1.1
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
    ```
 
 3. Let `.github/workflows/release.yml` run GoReleaser.
