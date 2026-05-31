@@ -2,10 +2,46 @@
 
 ## Quick Install
 
-macOS or Linux with Homebrew:
+macOS with Homebrew:
+
+```bash
+brew install --cask marlonjd/tap/mobile-release
+```
+
+The initial `v0.1.0` source formula can also be installed with:
 
 ```bash
 brew install marlonjd/tap/mobile-release
+```
+
+Windows with Scoop:
+
+```powershell
+scoop bucket add marlonjd https://github.com/MarlonJD/scoop-bucket
+scoop install marlonjd/mobile-release
+```
+
+Windows with WinGet, after the package is accepted into the public WinGet
+community repository:
+
+```powershell
+winget install MarlonJD.MobileRelease
+```
+
+Linux can install the `.deb` or `.rpm` package from GitHub Releases:
+
+```bash
+sudo apt install ./mobile-release*.deb
+sudo dnf install ./mobile-release*.rpm
+```
+
+Direct archives are published on GitHub Releases for every supported
+OS/architecture:
+
+```text
+darwin/amd64, darwin/arm64
+linux/amd64, linux/arm64
+windows/amd64, windows/arm64
 ```
 
 Any platform with Go installed:
@@ -20,8 +56,8 @@ Verify:
 mobile-release --help
 ```
 
-Windows users should use the Go install path until the Scoop/WinGet packages
-are published.
+Full installation and maintainer publishing details are in
+[docs/installation.md](docs/installation.md).
 
 `mobile-release-tools` provides `mobile-release`, a local-first release CLI for
 iOS and Android applications. It exists to make mobile shipping repeatable
@@ -90,7 +126,7 @@ go test ./...
 go run ./cmd/mobile-release --help
 ```
 
-Install options and planned package-manager channels are documented in
+Install options and package-manager publishing details are documented in
 [docs/installation.md](docs/installation.md).
 
 

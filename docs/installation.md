@@ -1,100 +1,146 @@
 # Installation
 
-`mobile-release` is currently distributed through a Homebrew source formula and
-a pinned Go source install. Binary archives, Scoop, WinGet, `.deb`, and `.rpm`
-packages are planned follow-up channels.
+`mobile-release` is distributed as a single CLI binary and as native package
+manager metadata for the common desktop/server environments used by release
+owners.
 
-## Available Now
+The first tagged source release was `v0.1.0`. The full binary/package release
+workflow is active for the next tag after this workflow lands.
+
+## Supported Install Channels
 
 ### macOS
 
-Preferred install path:
+Homebrew Cask is the preferred binary install path for tags published by the
+release workflow:
+
+```bash
+brew install --cask marlonjd/tap/mobile-release
+```
+
+The initial `v0.1.0` source formula can still be installed with:
 
 ```bash
 brew install marlonjd/tap/mobile-release
 ```
 
-Verify:
+### Windows: Scoop
 
-```bash
-mobile-release --help
+```powershell
+scoop bucket add marlonjd https://github.com/MarlonJD/scoop-bucket
+scoop install marlonjd/mobile-release
 ```
 
-### Linux
+The Scoop manifest is generated from GitHub Release checksums and committed to
+`MarlonJD/scoop-bucket` by the release workflow.
 
-Use Homebrew/Linuxbrew when available:
+### Windows: WinGet
 
-```bash
-brew install marlonjd/tap/mobile-release
+```powershell
+winget install MarlonJD.MobileRelease
 ```
 
-Or install from source with Go:
+WinGet publishing is slower than Scoop because it goes through the public
+`microsoft/winget-pkgs` review flow. The release workflow generates the WinGet
+manifest and opens a pull request from `MarlonJD/winget-pkgs` to
+`microsoft/winget-pkgs`.
+
+Until the WinGet PR for a version is merged, use Scoop or the direct Windows
+archive from GitHub Releases.
+
+### Linux: Debian/Ubuntu
+
+Download the `.deb` package from the matching GitHub Release, then install it:
+
+```bash
+sudo apt install ./mobile-release*.deb
+```
+
+### Linux: Fedora/RHEL
+
+Download the `.rpm` package from the matching GitHub Release, then install it:
+
+```bash
+sudo dnf install ./mobile-release*.rpm
+```
+
+### Direct GitHub Releases
+
+Every tag publishes direct archives for the supported OS/architecture matrix:
+
+```text
+mobile-release_<version>_darwin_amd64.tar.gz
+mobile-release_<version>_darwin_arm64.tar.gz
+mobile-release_<version>_linux_amd64.tar.gz
+mobile-release_<version>_linux_arm64.tar.gz
+mobile-release_<version>_windows_amd64.zip
+mobile-release_<version>_windows_arm64.zip
+checksums.txt
+```
+
+Manual install from a direct archive:
+
+```bash
+tar -xzf mobile-release_<version>_<os>_<arch>.tar.gz
+sudo install -m 0755 mobile-release /usr/local/bin/mobile-release
+```
+
+For Windows, unzip the matching `.zip` archive and put `mobile-release.exe` on
+`PATH`.
+
+### Go Source Fallback
+
+Use the Go path only when package-manager or archive install is not available:
 
 ```bash
 go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.0
 ```
 
-Make sure Go's binary directory is on `PATH`:
+Make sure Go's binary directory is on `PATH`.
+
+Linux/macOS:
 
 ```bash
 export PATH="$(go env GOPATH)/bin:$PATH"
 ```
 
-### Windows
-
-Use the Go install path until the Scoop/WinGet packages are published:
-
-```powershell
-go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.0
-```
-
-Make sure Go's binary directory is on `PATH`:
+Windows PowerShell:
 
 ```powershell
 $env:Path += ";$(go env GOPATH)\bin"
 ```
 
-Verify:
+## Verify
 
-```powershell
+```bash
 mobile-release --help
 ```
 
-## Planned Channels
+The command should print support for:
 
-These channels should be added after GitHub release binaries are published:
+- `bump`
+- `changelog`
+- `hash`
+- `manifest`
+- `mobile package android`
+- `mobile package ios`
 
-- Windows: Scoop bucket.
-- Windows: WinGet package.
-- Linux: `.deb` package.
-- Linux: `.rpm` package.
-- Direct: GitHub Releases archives for each supported OS/architecture.
+## Maintainer Release Prerequisites
 
-Snap can be added later if the tool needs Snap Store discovery. It is not the
-first release channel because it adds store metadata, review, and sandbox
-maintenance that are not needed for a local release CLI.
+Before pushing a release tag, these repositories must exist:
 
-## Homebrew Formula
+- `MarlonJD/homebrew-tap`
+- `MarlonJD/scoop-bucket`
+- `MarlonJD/winget-pkgs`, forked from `microsoft/winget-pkgs`
 
-The Homebrew formula lives in `MarlonJD/homebrew-tap`:
+The `mobile-release-tools` repository must also define these GitHub Actions
+secrets:
 
-```text
-Formula/mobile-release.rb
-```
-
-It builds from the tagged source archive:
-
-```text
-https://github.com/MarlonJD/mobile-release-tools/archive/refs/tags/v0.1.0.tar.gz
-```
-
-## Source Install Version Pin
-
-Use explicit tags instead of `latest` when installing into a release machine:
-
-```bash
-go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.0
-```
+- `RELEASE_PUBLISH_TOKEN`: personal access token with write access to
+  `MarlonJD/homebrew-tap` and `MarlonJD/scoop-bucket`.
+- `WINGET_TOKEN`: personal access token with write access to
+  `MarlonJD/winget-pkgs`. If omitted, the workflow reuses
+  `RELEASE_PUBLISH_TOKEN`.
 
 ## Maintainer Release Flow
 
@@ -104,19 +150,27 @@ go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.0
    go test ./...
    ```
 
-2. Create a SemVer tag:
+2. Create and push a SemVer tag:
 
    ```bash
    git tag v0.1.1
    git push origin v0.1.1
    ```
 
-3. Update `MarlonJD/homebrew-tap/Formula/mobile-release.rb` to the new tag and
-   source tarball SHA-256.
+3. Let `.github/workflows/release.yml` run GoReleaser.
 
-4. Run the tap checks:
+The workflow publishes:
 
-   ```bash
-   ruby -c Formula/mobile-release.rb
-   brew style Formula/mobile-release.rb
-   ```
+- GitHub Release archives for macOS, Linux, and Windows.
+- `checksums.txt`.
+- Linux `.deb` packages.
+- Linux `.rpm` packages.
+- Homebrew Cask update in `MarlonJD/homebrew-tap`.
+- Scoop manifest update in `MarlonJD/scoop-bucket`.
+- WinGet manifest pull request against `microsoft/winget-pkgs`.
+
+## Notes
+
+Snap can be added later if the tool needs Snap Store discovery. It is not the
+first release channel because it adds store metadata, review, and sandbox
+maintenance that are not needed for a local release CLI.

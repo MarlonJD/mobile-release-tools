@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  goreleaser:
+    name: GoReleaser
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Check release publishing secrets
+        run: |
+          test -n "${RELEASE_PUBLISH_TOKEN}" || (echo "RELEASE_PUBLISH_TOKEN is required for Homebrew and Scoop publishing" && exit 1)
+          test -n "${WINGET_TOKEN}" || (echo "WINGET_TOKEN or RELEASE_PUBLISH_TOKEN is required for WinGet publishing" && exit 1)
+        env:
+          RELEASE_PUBLISH_TOKEN: ${{ secrets.RELEASE_PUBLISH_TOKEN }}
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN || secrets.RELEASE_PUBLISH_TOKEN }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_PUBLISH_TOKEN: ${{ secrets.RELEASE_PUBLISH_TOKEN }}
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN || secrets.RELEASE_PUBLISH_TOKEN }}

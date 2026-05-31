@@ -22,7 +22,7 @@ builds:
 
 archives:
   - id: default
-    builds:
+    ids:
       - mobile-release
     name_template: >-
       {{ .ProjectName }}_
@@ -46,32 +46,55 @@ snapshot:
 changelog:
   disable: true
 
-brews:
+homebrew_casks:
   - name: mobile-release
+    ids:
+      - default
+    binaries:
+      - mobile-release
     repository:
       owner: MarlonJD
       name: homebrew-tap
-    directory: Formula
+      token: "{{ .Env.RELEASE_PUBLISH_TOKEN }}"
+    directory: Casks
+    url:
+      verified: github.com/MarlonJD/mobile-release-tools/
     homepage: https://github.com/MarlonJD/mobile-release-tools
     description: Local-first mobile release CLI for iOS and Android
-    license: GPL-3.0-or-later
-    install: |
-      bin.install "mobile-release"
-    test: |
-      system "#{bin}/mobile-release", "--help"
+    commit_author:
+      name: marlonjd
+      email: burak.karahan@mail.ru
+    commit_msg_template: "brew cask: update mobile-release to {{ .Tag }}"
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/mobile-release"]
+          end
 
 scoops:
   - name: mobile-release
     repository:
       owner: MarlonJD
       name: scoop-bucket
+      token: "{{ .Env.RELEASE_PUBLISH_TOKEN }}"
     homepage: https://github.com/MarlonJD/mobile-release-tools
     description: Local-first mobile release CLI for iOS and Android
     license: GPL-3.0-or-later
+    commit_author:
+      name: marlonjd
+      email: burak.karahan@mail.ru
+    commit_msg_template: "scoop: update mobile-release to {{ .Tag }}"
+    shortcuts:
+      - - mobile-release.exe
+        - mobile-release
 
 nfpms:
   - id: packages
     package_name: mobile-release
+    file_name_template: "{{ .ConventionalFileName }}"
+    ids:
+      - mobile-release
     vendor: MarlonJD
     homepage: https://github.com/MarlonJD/mobile-release-tools
     maintainer: marlonjd <burak.karahan@mail.ru>
@@ -81,3 +104,39 @@ nfpms:
       - deb
       - rpm
     bindir: /usr/bin
+
+winget:
+  - name: mobile-release
+    publisher: Burak Karahan
+    package_identifier: MarlonJD.MobileRelease
+    package_name: mobile-release
+    short_description: Local-first mobile release CLI for iOS and Android
+    description: Local-first mobile release CLI for iOS and Android packaging, changelogs, hashes, and release manifests.
+    homepage: https://github.com/MarlonJD/mobile-release-tools
+    publisher_url: https://github.com/MarlonJD
+    publisher_support_url: https://github.com/MarlonJD/mobile-release-tools/issues/new
+    license: GPL-3.0-or-later
+    license_url: https://github.com/MarlonJD/mobile-release-tools/blob/main/LICENSE
+    release_notes_url: https://github.com/MarlonJD/mobile-release-tools/releases/tag/{{ .Tag }}
+    tags:
+      - mobile
+      - release
+      - ios
+      - android
+      - cli
+    repository:
+      owner: MarlonJD
+      name: winget-pkgs
+      branch: mobile-release-{{ .Version }}
+      token: "{{ .Env.WINGET_TOKEN }}"
+      pull_request:
+        enabled: true
+        draft: false
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+    commit_author:
+      name: marlonjd
+      email: burak.karahan@mail.ru
+    commit_msg_template: "winget: update {{ .PackageIdentifier }} to {{ .Tag }}"
