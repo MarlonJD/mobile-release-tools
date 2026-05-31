@@ -22,7 +22,7 @@ Usage:
   mobile-release hash --file path/to/artifact
   mobile-release manifest --platform ios|android --version 1.4.3 --build 104 --artifact path [--notes RELEASE_NOTES.md] [--output manifest.json]
   mobile-release package android --channel production
-  mobile-release package ios --export-options apps/ios/release/ExportOptions-app-store.plist
+  mobile-release package ios
 `
 
 func main() {
@@ -296,7 +296,7 @@ func runMobilePackageIOS(args []string, stdout io.Writer) error {
 	testDestination := fs.String("test-destination", "platform=iOS Simulator,name=iPhone 17", "xcodebuild test destination")
 	skipTesting := fs.String("skip-testing", "emsi_iosUITests", "optional xcodebuild -skip-testing target")
 	skipTests := fs.Bool("skip-tests", false, "skip iOS unit tests")
-	allowProvisioningUpdates := fs.Bool("allow-provisioning-updates", false, "allow Xcode to update signing assets")
+	allowProvisioningUpdates := fs.Bool("allow-provisioning-updates", true, "allow Xcode to update signing assets; set false to require existing signing assets")
 	dryRun := fs.Bool("dry-run", false, "print commands without running them")
 	if err := fs.Parse(args); err != nil {
 		return err

@@ -47,7 +47,7 @@ windows/amd64, windows/arm64
 Any platform with Go installed:
 
 ```bash
-go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.2.1
+go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.2.2
 ```
 
 Verify:
@@ -114,7 +114,7 @@ brew install --cask marlonjd/tap/mobile-release
 Pinned source install with Go:
 
 ```bash
-go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.2.1
+go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.2.2
 ```
 
 Or clone and run directly:
@@ -194,11 +194,7 @@ Replace `YOUR_TEAM_ID` with the Apple Developer Team ID used by the app target.
 Package a signed `.ipa`:
 
 ```bash
-mobile-release package ios \
-  --project apps/ios/emsi_ios.xcodeproj \
-  --scheme emsi_ios \
-  --export-options apps/ios/release/ExportOptions-app-store.plist \
-  --allow-provisioning-updates
+mobile-release package ios
 ```
 
 What this runs:
@@ -225,6 +221,16 @@ calculated from Conventional Commits, and the next build increments the current
 project build. Git tags are used only to find the changelog range. Use
 `--dry-run` to print the commands and final upload summary without running
 Xcode.
+
+The default iOS command assumes:
+
+- Project: `apps/ios/emsi_ios.xcodeproj`
+- Scheme: `emsi_ios`
+- Export options: `apps/ios/release/ExportOptions-app-store.plist`
+- Xcode provisioning updates: enabled
+
+Override those flags only when the app uses different paths or when signing
+must be fully pre-provisioned.
 
 ## Android Setup From Scratch
 
@@ -299,7 +305,7 @@ Use `--include-apk` to also run `:app:assembleRelease` for QA builds. Use
    ```
 
    ```bash
-   mobile-release package ios --export-options apps/ios/release/ExportOptions-app-store.plist --allow-provisioning-updates
+   mobile-release package ios
    ```
 
 The package command automatically:
@@ -328,7 +334,7 @@ mobile-release changelog --repo . --from v1.4.2 --to HEAD --version 1.4.3 --outp
 mobile-release hash --file path/to/artifact
 mobile-release manifest --platform ios|android --version 1.4.3 --build 104 --artifact path --notes RELEASE_NOTES.md --output manifest.json
 mobile-release package android --channel production [--build-file apps/android/app/build.gradle.kts]
-mobile-release package ios --export-options apps/ios/release/ExportOptions-app-store.plist
+mobile-release package ios
 ```
 
 ## Changelog Policy
@@ -395,8 +401,9 @@ iOS export fails because signing assets are missing:
 
 - Confirm the app target has the correct Team ID and bundle ID.
 - Sign into Xcode with the Apple Developer account.
-- Pass `--allow-provisioning-updates` if automatic signing should update
-  provisioning assets.
+- `mobile-release package ios` allows Xcode provisioning updates by default.
+  Pass `--allow-provisioning-updates=false` only when signing assets must
+  already exist locally.
 
 The app version changed after export:
 
