@@ -177,7 +177,11 @@ automatically for the current repository.
 
 2. Create and push a SemVer tag:
 
+   Commit the release change first, then tag the exact commit that should be
+   published.
+
    ```bash
+   git push origin main
    git tag vX.Y.Z
    git push origin vX.Y.Z
    ```
@@ -193,11 +197,16 @@ The default tag workflow publishes:
 
 Package-manager metadata publishing is a separate manual workflow dispatch
 until the required repositories and secrets are present. Run the release
-workflow manually with `publish_package_managers=true` after creating:
+workflow manually on the same tag with `publish_package_managers=true` after
+creating:
 
 - Homebrew Cask update target in `MarlonJD/homebrew-tap`.
 - Scoop manifest target in `MarlonJD/scoop-bucket`.
 - WinGet manifest fork/PR target in `MarlonJD/winget-pkgs`.
+
+```bash
+gh workflow run release.yml --ref vX.Y.Z -f publish_package_managers=true
+```
 
 ## Notes
 

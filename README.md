@@ -129,6 +129,62 @@ go run ./cmd/mobile-release --help
 Install options and package-manager publishing details are documented in
 [docs/installation.md](docs/installation.md).
 
+## Publishing CLI Updates From Scratch
+
+This section is for maintainers publishing a new `mobile-release` CLI version.
+It is separate from using the CLI to package an iOS or Android app.
+
+One-time setup:
+
+1. Keep these package-manager repositories available:
+   - `MarlonJD/homebrew-tap`
+   - `MarlonJD/scoop-bucket`
+   - `MarlonJD/winget-pkgs`, forked from `microsoft/winget-pkgs`
+2. In `MarlonJD/mobile-release-tools`, add repository secrets at
+   `Settings -> Secrets and variables -> Actions`:
+   - `RELEASE_PUBLISH_TOKEN`: GitHub personal access token that can write to
+     `MarlonJD/homebrew-tap` and `MarlonJD/scoop-bucket`.
+   - `WINGET_TOKEN`: GitHub personal access token that can write to
+     `MarlonJD/winget-pkgs`.
+3. For public repositories, a classic GitHub personal access token with the
+   `public_repo` scope is enough. A fine-grained token can also be used with
+   `Contents: Read and write` and `Pull requests: Read and write` on the three
+   package-manager repositories.
+
+Publish a new CLI version:
+
+Commit the release change first, then tag the exact commit that should be
+published:
+
+```bash
+go test ./...
+git status --short
+git push origin main
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+Pushing the tag publishes direct GitHub Release assets automatically:
+
+- macOS/Linux/Windows archives.
+- `checksums.txt`.
+- Linux `.deb` packages.
+- Linux `.rpm` packages.
+
+After the tag release succeeds, run the `Release` workflow manually on the same
+tag with `publish_package_managers=true` to publish package-manager metadata:
+
+```bash
+gh workflow run release.yml --ref vX.Y.Z -f publish_package_managers=true
+```
+
+- Homebrew Cask to `MarlonJD/homebrew-tap`.
+- Scoop manifest to `MarlonJD/scoop-bucket`.
+- WinGet manifest PR from `MarlonJD/winget-pkgs` to `microsoft/winget-pkgs`.
+
+If package-manager repositories or secrets are not ready yet, the tag release is
+still valid; users can install from GitHub Releases, `.deb`, `.rpm`, or the
+pinned Go install.
 
 ## Expected App Repository Setup
 
