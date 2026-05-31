@@ -5,6 +5,12 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      publish_package_managers:
+        description: "Also publish Homebrew Cask, Scoop, and WinGet metadata"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -24,7 +30,8 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Check release publishing secrets
+      - name: Check package-manager publishing secrets
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_package_managers }}
         run: |
           test -n "${RELEASE_PUBLISH_TOKEN}" || (echo "RELEASE_PUBLISH_TOKEN is required for Homebrew and Scoop publishing" && exit 1)
           test -n "${WINGET_TOKEN}" || (echo "WINGET_TOKEN or RELEASE_PUBLISH_TOKEN is required for WinGet publishing" && exit 1)
@@ -32,7 +39,18 @@ jobs:
           RELEASE_PUBLISH_TOKEN: ${{ secrets.RELEASE_PUBLISH_TOKEN }}
           WINGET_TOKEN: ${{ secrets.WINGET_TOKEN || secrets.RELEASE_PUBLISH_TOKEN }}
 
-      - name: Run GoReleaser
+      - name: Publish direct release assets
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.publish_package_managers }}
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean --skip=homebrew,scoop,winget
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish release assets and package-manager metadata
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_package_managers }}
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser

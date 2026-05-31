@@ -4,8 +4,9 @@
 manager metadata for the common desktop/server environments used by release
 owners.
 
-The first tagged source release was `v0.1.0`. The full binary/package release
-workflow is active for the next tag after this workflow lands.
+The first tagged source release was `v0.1.0`; it only contains GitHub's
+automatic source archives. Use `v0.1.1` or newer for platform archives,
+checksums, `.deb`, and `.rpm` release assets.
 
 ## Supported Install Channels
 
@@ -93,7 +94,7 @@ For Windows, unzip the matching `.zip` archive and put `mobile-release.exe` on
 Use the Go path only when package-manager or archive install is not available:
 
 ```bash
-go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.0
+go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.1
 ```
 
 Make sure Go's binary directory is on `PATH`.
@@ -159,15 +160,20 @@ secrets:
 
 3. Let `.github/workflows/release.yml` run GoReleaser.
 
-The workflow publishes:
+The default tag workflow publishes:
 
 - GitHub Release archives for macOS, Linux, and Windows.
 - `checksums.txt`.
 - Linux `.deb` packages.
 - Linux `.rpm` packages.
-- Homebrew Cask update in `MarlonJD/homebrew-tap`.
-- Scoop manifest update in `MarlonJD/scoop-bucket`.
-- WinGet manifest pull request against `microsoft/winget-pkgs`.
+
+Package-manager metadata publishing is a separate manual workflow dispatch
+until the required repositories and secrets are present. Run the release
+workflow manually with `publish_package_managers=true` after creating:
+
+- Homebrew Cask update target in `MarlonJD/homebrew-tap`.
+- Scoop manifest target in `MarlonJD/scoop-bucket`.
+- WinGet manifest fork/PR target in `MarlonJD/winget-pkgs`.
 
 ## Notes
 

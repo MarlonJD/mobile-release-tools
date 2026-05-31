@@ -47,7 +47,7 @@ windows/amd64, windows/arm64
 Any platform with Go installed:
 
 ```bash
-go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.0
+go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.1
 ```
 
 Verify:
@@ -105,16 +105,16 @@ Windows, while platform-specific packaging stays delegated to Xcode and Gradle.
 
 ## Install Details
 
-Homebrew install:
+Homebrew binary install:
 
 ```bash
-brew install marlonjd/tap/mobile-release
+brew install --cask marlonjd/tap/mobile-release
 ```
 
 Pinned source install with Go:
 
 ```bash
-go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.0
+go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.1
 ```
 
 Or clone and run directly:
