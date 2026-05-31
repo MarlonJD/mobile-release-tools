@@ -1,5 +1,28 @@
 # Mobile Release Tools
 
+## Quick Install
+
+macOS or Linux with Homebrew:
+
+```bash
+brew install marlonjd/tap/mobile-release
+```
+
+Any platform with Go installed:
+
+```bash
+go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.0
+```
+
+Verify:
+
+```bash
+mobile-release --help
+```
+
+Windows users should use the Go install path until the Scoop/WinGet packages
+are published.
+
 `mobile-release-tools` provides `mobile-release`, a local-first release CLI for
 iOS and Android applications. It exists to make mobile shipping repeatable
 without forcing the project to depend on paid CI, a hosted release service, or
@@ -44,15 +67,15 @@ Go is used because this is a cross-platform release orchestrator, not an app
 runtime dependency. The CLI can be shipped as one binary for macOS, Linux, and
 Windows, while platform-specific packaging stays delegated to Xcode and Gradle.
 
-## Install
+## Install Details
 
-Homebrew:
+Homebrew install:
 
 ```bash
 brew install marlonjd/tap/mobile-release
 ```
 
-Pinned source install:
+Pinned source install with Go:
 
 ```bash
 go install github.com/MarlonJD/mobile-release-tools/cmd/mobile-release@v0.1.0
@@ -67,13 +90,9 @@ go test ./...
 go run ./cmd/mobile-release --help
 ```
 
-Planned package-manager channels are documented in
-[docs/installation.md](docs/installation.md):
+Install options and planned package-manager channels are documented in
+[docs/installation.md](docs/installation.md).
 
-- macOS: Homebrew tap
-- Windows: Scoop first, WinGet after the first stable release
-- Linux: Homebrew/Linuxbrew, `.deb`, and `.rpm`
-- Direct: GitHub Releases archives for every supported OS/architecture
 
 ## Expected App Repository Setup
 
