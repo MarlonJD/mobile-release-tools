@@ -66,3 +66,10 @@ platform build counters separate:
 
 CI is optional. The same commands are designed to run locally first, then in CI
 as a repeatable verification path when budget and approval are available.
+
+## License
+
+Copyright (C) 2026 Burak Karahan.
+
+This project is licensed under the GNU General Public License v3.0 or later.
+See [LICENSE](LICENSE) and [NOTICE](NOTICE).

@@ -54,7 +54,7 @@ brews:
     directory: Formula
     homepage: https://github.com/MarlonJD/mobile-release-tools
     description: Local-first mobile release CLI for iOS and Android
-    license: MIT
+    license: GPL-3.0-or-later
     install: |
       bin.install "emsi-release"
     test: |
@@ -67,7 +67,7 @@ scoops:
       name: scoop-bucket
     homepage: https://github.com/MarlonJD/mobile-release-tools
     description: Local-first mobile release CLI for iOS and Android
-    license: MIT
+    license: GPL-3.0-or-later
 
 nfpms:
   - id: packages
@@ -76,7 +76,7 @@ nfpms:
     homepage: https://github.com/MarlonJD/mobile-release-tools
     maintainer: marlonjd <burak.karahan@mail.ru>
     description: Local-first mobile release CLI for iOS and Android
-    license: MIT
+    license: GPL-3.0-or-later
     formats:
       - deb
       - rpm
